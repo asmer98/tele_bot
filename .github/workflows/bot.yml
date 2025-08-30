@@ -1,66 +1,72 @@
-name: Run YouTube Download Bot
+name: YouTube Download Bot
+
 on:
-  workflow_dispatch:  # يسمح بتشغيل Workflow يدوياً
+  workflow_dispatch:  # علشان تقدر تشغله يدوي
   schedule:
-    - cron: '0 0 * * *'  # يشغل تلقائياً كل يوم في منتصف الليل (اختياري)
+    - cron: '0 0 * * *'  # يشغل تلقائي كل يوم (اختياري)
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    timeout-minutes: 30  # عشان ما يعلق للأبد
     
     steps:
-    # 1. Checkout الكود
-    - name: Checkout repository
+    # 1. جلب الكود
+    - name: Checkout code
       uses: actions/checkout@v4
 
-    # 2. إعداد Python
-    - name: Set up Python
+    # 2. إعداد بايثون
+    - name: Setup Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
         cache: 'pip'
 
-    # 3. تثبيت dependencies
+    # 3. تثبيت المكتبات
     - name: Install dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install yt-dlp
-        pip install python-telegram-bot --upgrade
+        pip install --upgrade pip
+        pip install yt-dlp==2023.11.16  # نسخة مستقرة
+        pip install python-telegram-bot==20.7
+        pip install requests
 
-    # 4. إنشاء ملف cookies.txt من GitHub Secrets
+    # 4. إنشاء مجلد التحميلات
+    - name: Create downloads directory
+      run: |
+        mkdir -p downloads
+        chmod 777 downloads/
+
+    # 5. إنشاء ملف الكوكيز من GitHub Secrets
     - name: Create cookies file
       run: |
-        # إنشاء مجلد التحميلات
-        mkdir -p downloads
+        # أنشئ ملف الكوكيز من السر
+        echo '${{ secrets.YOUTUBE_COOKIES }}' > cookies.txt
         
-        # إنشاء ملف cookies.txt من السر
-        echo '${{ secrets.COOKIES_FILE }}' > cookies.txt
-        
-        # التحقق من أن الملف تم إنشاؤه بشكل صحيح
+        # تحقق من أن الملف مش فارغ
         if [ -s "cookies.txt" ]; then
-          echo "✅ تم إنشاء cookies.txt بنجاح"
-          echo "حجم الملف: $(wc -l < cookies.txt) سطر"
-          head -2 cookies.txt  # عرض أول سطرين للتحقق
+          echo "✅ تم إنشاء ملف الكوكيز بنجاح"
+          echo "عدد الأسطر: $(wc -l < cookies.txt)"
+          # عرض أول سطر للتحقق
+          head -1 cookies.txt
         else
-          echo "❌ تحذير: ملف cookies.txt فارغ أو غير موجود"
-          # إنشاء ملف فارغ لتجنب الأخطاء
+          echo "❌ ملف الكوكيز فارغ! سيتم العمل بدونه"
           touch cookies.txt
         fi
+        
+        chmod 644 cookies.txt
 
-    # 5. تشغيل البوت
+    # 6. تشغيل البوت
     - name: Run the bot
       env:
-        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}  # توكن البوت من Secrets
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
       run: |
         echo "🚀 بدء تشغيل البوت..."
         python bot.py
 
-    # 6. تنظيف الملفات المؤقتة (اختياري)
-    - name: Cleanup temporary files
-      if: always()  # يعمل حتى لو فشلت الخطوة السابقة
+    # 7. تنظيف الملفات (اختياري)
+    - name: Cleanup
+      if: always()
       run: |
         echo "🧹 تنظيف الملفات المؤقتة..."
         rm -f cookies.txt
         rm -rf downloads/*
-        echo "تم التنظيف"
