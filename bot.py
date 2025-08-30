@@ -12,7 +12,7 @@ CHANNEL_USERNAME = "@p_y_hy"
 # 📁 ملفات الكوكيز للمنصات المختلفة
 YOUTUBE_COOKIES = "cookies_youtube.txt"
 INSTAGRAM_COOKIES = "cookies_instagram.txt"
-#DEFAULT_COOKIES = "cookies.txt"
+DEFAULT_COOKIES = "cookies.txt"
 
 # 📝 إعدادات الـ logging
 logging.basicConfig(
