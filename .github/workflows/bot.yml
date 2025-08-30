@@ -1,9 +1,9 @@
 name: Run Telegram Bot
 
 on:
-  workflow_dispatch:   # تشغيل يدوي من GitHub Actions
-  push:                # يشتغل إذا دفعت كود جديد
-  schedule:            # يشتغل كل ساعة
+  workflow_dispatch:   # تشغيل يدوي
+  push:                # يشتغل عند أي دفع للكود
+  schedule:            # يعيد تشغيله كل ساعة
     - cron: "0 * * * *"
 
 jobs:
@@ -19,9 +19,13 @@ jobs:
       with:
         python-version: "3.10"
 
+    - name: Install ffmpeg
+      run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
     - name: Install dependencies
       run: |
         pip install -r requirements.txt
+        pip install -U yt-dlp   # تحديث yt-dlp دائماً
 
     - name: Run bot
       env:
