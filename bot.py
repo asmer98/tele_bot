@@ -39,67 +39,60 @@ async def is_subscribed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return False
 
 def download_video(url: str) -> str:
-    """تحميل الفيديو بإعدادات خاصة ل GitHub Actions"""
-    ydl_opts = {
-        # الإعدادات الأساسية
-        "format": "bestvideo+bestaudio/best",
-        "outtmpl": "downloads/%(title)s.%(ext)s",
-        "merge_output_format": "mp4",
-        "cookiefile": COOKIES_FILE if os.path.exists(COOKIES_FILE) else None,
-        
-        # 🔥 الإعدادات الحاسمة لحل المشكلة:
-        "verbose": True,
-        "no_warnings": False,
-        "ignoreerrors": False,
-        
-        # إعدادات الشبكة المهمة
-        "socket_timeout": 120,
-        "retries": 10,
-        "fragment_retries": 10,
-        "skip_unavailable_fragments": True,
-        "continue_dl": True,
-        
-        # ⚡ إعدادات يوتيوب المحددة
-        "extract_flat": False,
-        "live_from_start": True,
-        "wait_for_video": (5, 60),
-        
-        # 🌐 إعدادات User-Agent للتحايل على الحجب
-        "http_headers": {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-us,en;q=0.5",
-            "Accept-Encoding": "gzip,deflate",
-            "Accept-Charset": "ISO-8859-1,utf-8;q=0.7,*;q=0.7",
-            "Connection": "keep-alive",
-        },
-        
-        # إعدادات الأداء
-        "concurrent_fragment_downloads": 3,
-        "buffersize": 1024 * 1024,
-    }
-
+    """بديل طارئ للتحميل"""
+    import requests
+    import re
+    from urllib.parse import quote
+    
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            # تحميل المعلومات أولاً
-            info = ydl.extract_info(url, download=False)
-            logger.info(f"⏳ جاري تحميل: {info.get('title', 'unknown')}")
-            
-            # التحميل الفعلي
-            ydl.download([url])
-            
-            filename = ydl.prepare_filename(info)
-            return filename
-            
+        # استخراج ID الفيديو
+        video_id = re.search(r'(?:v=|\/)([0-9A-Za-z_-]{11}).*', url)
+        if not video_id:
+            raise Exception("رابط يوتيوب غير صحيح")
+        
+        video_id = video_id.group(1)
+        
+        # تحميل من موقع بديل
+        alt_url = f"https://yt1s.com/api/ajaxSearch/index"
+        payload = {
+            'q': f"https://www.youtube.com/watch?v={video_id}",
+            'vt': 'home'
+        }
+        
+        response = requests.post(alt_url, data=payload)
+        data = response.json()
+        
+        if 'vid' not in data:
+            raise Exception("فشل في الحصول على رابط التحميل")
+        
+        # الحصول على رابط التحميل
+        download_url = f"https://yt1s.com/api/ajaxConvert/convert"
+        download_payload = {
+            'vid': data['vid'],
+            'k': data['links']['mp4']['auto']['k']
+        }
+        
+        dl_response = requests.post(download_url, data=download_payload)
+        dl_data = dl_response.json()
+        
+        if 'dlink' not in dl_data:
+            raise Exception("فشل في التحويل")
+        
+        # تحميل الفيديو
+        video_url = dl_data['dlink']
+        filename = f"downloads/video_{video_id}.mp4"
+        
+        with requests.get(video_url, stream=True) as r:
+            r.raise_for_status()
+            with open(filename, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        
+        return filename
+        
     except Exception as e:
-        logger.error(f"خطأ في التحميل: {e}", exc_info=True)
+        logger.error(f"التحميل الطارئ فشل: {e}")
         raise Exception(f"فشل التحميل: {str(e)}")
-async def download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_subscribed(update, context):
-        await update.message.reply_text(
-            f"⚠️ حتى تقدر تستخدم البوت، اشترك أولًا بالقناة: {CHANNEL_USERNAME}"
-        )
-        return
 
     url = update.message.text.strip()
     
