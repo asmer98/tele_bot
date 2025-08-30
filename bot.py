@@ -12,7 +12,7 @@ CHANNEL_USERNAME = "@p_y_hy"
 # 📁 ملفات الكوكيز للمنصات المختلفة
 YOUTUBE_COOKIES = "cookies_youtube.txt"
 INSTAGRAM_COOKIES = "cookies_instagram.txt"
-DEFAULT_COOKIES = "cookies.txt"
+#DEFAULT_COOKIES = "cookies.txt"
 
 # 📝 إعدادات الـ logging
 logging.basicConfig(
@@ -28,7 +28,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(
-        "👋 أهلاً بيك! أرسل لي رابط الفيديو من أي منصة وأنا أحمله إلك 🎥\n\n"
+        "👋 أهلاً بيك في بوت احمد خان أرسل لي رابط الفيديو من أي منصة وأنا أحمله إلك 🎥\n\n"
         "📱 المنصات المدعومة:\n"
         "• يوتيوب YouTube\n• تويتر/X\n• انستغرام Instagram\n"
         "• فيسبوك Facebook\n• تيك توك TikTok\n• ريديت Reddit\n"
