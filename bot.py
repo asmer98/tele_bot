@@ -24,17 +24,15 @@ SUPPORTED_PLATFORMS = [
     'instagram.com',                    # انستغرام
     'facebook.com', 'fb.watch',         # فيسبوك
     'tiktok.com',                       # تيك توك
-    'reddit.com',                       |# ريديت
-    'twitch.tv',                        |# تويتش
-    'dailymotion.com',                  |# ديلي موشن
-    'vimeo.com',                        |# فيمو
-    'soundcloud.com',                   |# ساوند كلاود
-    'pinterest.com',                    |# بينتريست
-    'likee.video',                      |# لايكي
-    'rumble.com',                       |# رامبل
-    'bilibili.com',                     |# بيلبيل
-    'nicovideo.jp',                     |# نيكو نيكو
-    'twitcasting.tv',                   |# تويتر كاستينغ
+    'reddit.com',                       # ريديت
+    'twitch.tv',                        # تويتش
+    'dailymotion.com',                  # ديلي موشن
+    'vimeo.com',                        # فيمو
+    'soundcloud.com',                   # ساوند كلاود
+    'pinterest.com',                    # بينتريست
+    'likee.video',                      # لايكي
+    'rumble.com',                       # رامبل
+    'bilibili.com',                     # بيلبيل
 ]
 
 # ──────────── الأوامر ────────────
