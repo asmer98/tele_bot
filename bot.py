@@ -24,7 +24,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(
-        "👋 أهلاً بيك! أرسل لي رابط الفيديو من أي منصة وأنا أحمله إلك 🎥"
+        "👋 أهلاً بيك انا بوت احمد خان أرسل لي رابط الفيديو من أي منصة وأنا أحمله إلك 🎥"
     )
 
 async def is_subscribed(update: Update, context: ContextTypes.DEFAULT_TYPE):
