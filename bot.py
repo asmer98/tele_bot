@@ -17,13 +17,43 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# قائمة بالمنصات المدعومة (يمكن إضافة المزيد)
+SUPPORTED_PLATFORMS = [
+    'youtube.com', 'youtu.be',          # يوتيوب
+    'twitter.com', 'x.com',             # تويتر/X
+    'instagram.com',                    # انستغرام
+    'facebook.com', 'fb.watch',         # فيسبوك
+    'tiktok.com',                       # تيك توك
+    'reddit.com',                       |# ريديت
+    'twitch.tv',                        |# تويتش
+    'dailymotion.com',                  |# ديلي موشن
+    'vimeo.com',                        |# فيمو
+    'soundcloud.com',                   |# ساوند كلاود
+    'pinterest.com',                    |# بينتريست
+    'likee.video',                      |# لايكي
+    'rumble.com',                       |# رامبل
+    'bilibili.com',                     |# بيلبيل
+    'nicovideo.jp',                     |# نيكو نيكو
+    'twitcasting.tv',                   |# تويتر كاستينغ
+]
+
 # ──────────── الأوامر ────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_subscribed(update, context):
         await update.message.reply_text(f"⚠️ حتى تقدر تستخدم البوت، اشترك أولًا بالقناة: {CHANNEL_USERNAME}")
         return
 
-    await update.message.reply_text("👋 أهلاً بيك! أرسل لي رابط الفيديو من أي منصة وأنا أحمله إلك 🎥")
+    await update.message.reply_text(
+        "👋 أهلاً بيك حبيبي في بوت احمد خان أرسل لي رابط الفيديو من أي منصة وأنا أحمله إلك 🎥\n\n"
+        "📱 المنصات المدعومة:\n"
+        "• يوتيوب YouTube\n"
+        "• تويتر Twitter/X\n" 
+        "• انستغرام Instagram\n"
+        "• فيسبوك Facebook\n"
+        "• تيك توك TikTok\n"
+        "• ريديت Reddit\n"
+        "• والمزيد..."
+    )
 
 async def is_subscribed(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """يتأكد من أن المستخدم مشترك بالقناة"""
@@ -35,21 +65,33 @@ async def is_subscribed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ أثناء التحقق من الاشتراك: {e}")
         return False
 
+def is_supported_url(url: str) -> bool:
+    """يتحقق إذا كان الرابط من منصة مدعومة"""
+    import re
+    # تحقق من أن الرابط يحتوي على نطاق من المنصات المدعومة
+    return any(platform in url for platform in SUPPORTED_PLATFORMS)
+
 def download_video(url: str) -> str:
-    """تحميل الفيديو وإرجاع المسار"""
+    """تحميل الفيديو من أي منصة"""
     ydl_opts = {
-        "format": "best",
+        "format": "best",  # أفضل جودة متاحة
         "outtmpl": "downloads/%(title)s.%(ext)s",
         "cookiefile": COOKIES_FILE if os.path.exists(COOKIES_FILE) else None,
         "quiet": True,
         "socket_timeout": 30,
         "retries": 3,
+        "noplaylist": True,  # عدم تحميل القوائم
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
+            
+            # تسجيل معلومات المنصة
+            platform = info.get('extractor', 'unknown')
+            logger.info(f"تم التحميل من {platform}: {info.get('title', 'unknown')}")
+            
             return filename
     except Exception as e:
         logger.error(f"خطأ في التحميل: {e}")
@@ -62,15 +104,20 @@ async def download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     url = update.message.text.strip()
     
-    # تحقق إذا كان الرابط يحتوي على نطاق يوتيوب
-    if "youtube.com" not in url and "youtu.be" not in url:
-        await update.message.reply_text("❌ هذا الرابط ليس رابط يوتيوب صالح")
+    # التحقق إذا كان الرابط مدعوم
+    if not is_supported_url(url):
+        await update.message.reply_text(
+            "❌ هذا الرابط غير مدعوم أو غير صحيح\n\n"
+            "✅ المنصات المدعومة:\n"
+            "• يوتيوب\n• تويتر/X\n• انستغرام\n• فيسبوك\n"
+            "• تيك توك\n• ريديت\n• تويتش\n• وغيرها\n\n"
+            "🔗 مثال: https://www.youtube.com/watch?v=..."
+        )
         return
 
     await update.message.reply_text("⏳ جاري التحميل، انتظر شوي...")
 
     try:
-        # 🔥 الحل: استخدام asyncio.to_thread للدوال الغير async
         filename = await asyncio.to_thread(download_video, url)
         
         await update.message.reply_text("✅ تم التحميل! جاري الإرسال...")
@@ -86,7 +133,14 @@ async def download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     except Exception as e:
         logger.error(f"خطأ أثناء التحميل: {e}")
-        await update.message.reply_text(f"❌ صار خطأ أثناء التحميل: {str(e)}")
+        error_msg = str(e)
+        
+        if "Private" in error_msg or "Sign in" in error_msg:
+            await update.message.reply_text("🔒 هذا المحتوى خاص أو يتطلب تسجيل دخول")
+        elif "Unsupported" in error_msg:
+            await update.message.reply_text("❌ هذه المنصة غير مدعومة حالياً")
+        else:
+            await update.message.reply_text(f"❌ صار خطأ أثناء التحميل: {error_msg}")
 
 async def cookies_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """عرض معلومات عن ملف الكوكيز"""
@@ -95,6 +149,16 @@ async def cookies_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(f"📁 ملف الكوكيز موجود\nالحجم: {file_size} bytes")
     else:
         await update.message.reply_text("❌ ملف cookies.txt غير موجود")
+
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """عرض رسالة المساعدة"""
+    await update.message.reply_text(
+        "📖 أوامر البوت:\n\n"
+        "/start - بدء استخدام البوت\n"
+        "/help - عرض هذه الرسالة\n"
+        "/cookies - معلومات عن ملف الكوكيز\n\n"
+        "📱 فقط أرسل رابط الفيديو وسأحمله لك!"
+    )
 
 # ──────────── تشغيل التطبيق ────────────
 if __name__ == "__main__":
@@ -106,6 +170,7 @@ if __name__ == "__main__":
 
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("cookies", cookies_info))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_handler))
 
