@@ -39,31 +39,54 @@ async def is_subscribed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return False
 
 def download_video(url: str) -> str:
-    """تحميل الفيديو وإرجاع المسار"""
-    ydl_opts = {
-        "format": "best",
-        "outtmpl": "downloads/%(title)s.%(ext)s",
-        "cookiefile": COOKIES_FILE if os.path.exists(COOKIES_FILE) else None,  # إضافة الكوكيز إذا الملف موجود
-        "quiet": True,  # تقليل الإخراج في السجلات
-    }
-
+    """تحميل الفيديو بإعدادات بديلة"""
+    import subprocess
+    import random
+    
+    # إنشاء اسم ملف عشوائي لمنع التعارض
+    random_id = random.randint(1000, 9999)
+    output_template = f"downloads/video_{random_id}.%(ext)s"
+    
+    # بناء أمر yt-dlp يدويًا
+    cmd = [
+        "yt-dlp",
+        "-f", "best[height<=720]",  # دقة متوسطة لزيادة النجاح
+        "--no-part",
+        "--socket-timeout", "30",
+        "--retries", "5",
+        "--fragment-retries", "5",
+        "--output", output_template,
+    ]
+    
+    # إضافة الكوكيز إذا موجود
+    if os.path.exists(COOKIES_FILE):
+        cmd.extend(["--cookies", COOKIES_FILE])
+    
+    # إضافة الرابط
+    cmd.append(url)
+    
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            filename = ydl.prepare_filename(info)
-            
-            # تسجيل معلومات عن الفيديو الذي تم تحميله
-            logger.info(f"تم تحميل: {info.get('title', 'unknown title')}")
-            logger.info(f"تم الحفظ في: {filename}")
-            
-            return filename
-            
-    except yt_dlp.utils.DownloadError as e:
-        logger.error(f"خطأ في التحميل: {e}")
-        raise Exception(f"خطأ في التحميل: {str(e)}")
+        # تنفيذ الأمر مباشرة
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        
+        if result.returncode != 0:
+            logger.error(f"خطأ في الأمر: {result.stderr}")
+            raise Exception(f"فشل التنفيذ: {result.stderr}")
+        
+        # البحث عن الملف المحمل
+        download_dir = "downloads"
+        for file in os.listdir(download_dir):
+            if file.startswith(f"video_{random_id}"):
+                return os.path.join(download_dir, file)
+        
+        raise Exception("لم يتم العثور على الملف بعد التحميل")
+        
+    except subprocess.TimeoutExpired:
+        logger.error("انتهى وقت التحميل")
+        raise Exception("التحميل أخذ وقت طويل جداً")
     except Exception as e:
-        logger.error(f"خطأ غير متوقع: {e}")
-        raise Exception(f"حدث خطأ غير متوقع: {str(e)}")
+        logger.error(f"خطأ في التحميل: {e}")
+        raise
 
 async def download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_subscribed(update, context):
