@@ -17,24 +17,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# قائمة بالمنصات المدعومة (يمكن إضافة المزيد)
-SUPPORTED_PLATFORMS = [
-    'youtube.com', 'youtu.be',          # يوتيوب
-    'twitter.com', 'x.com',             # تويتر/X
-    'instagram.com',                    # انستغرام
-    'facebook.com', 'fb.watch',         # فيسبوك
-    'tiktok.com',                       # تيك توك
-    'reddit.com',                       # ريديت
-    'twitch.tv',                        # تويتش
-    'dailymotion.com',                  # ديلي موشن
-    'vimeo.com',                        # فيمو
-    'soundcloud.com',                   # ساوند كلاود
-    'pinterest.com',                    # بينتريست
-    'likee.video',                      # لايكي
-    'rumble.com',                       # رامبل
-    'bilibili.com',                     # بيلبيل
-]
-
 # ──────────── الأوامر ────────────
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_subscribed(update, context):
@@ -42,15 +24,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     await update.message.reply_text(
-        "👋 أهلاً بيك حبيبي في بوت احمد خان أرسل لي رابط الفيديو من أي منصة وأنا أحمله إلك 🎥\n\n"
+        "👋 أهلاً بيك! أرسل لي رابط الفيديو من أي منصة وأنا أحمله إلك 🎥\n\n"
         "📱 المنصات المدعومة:\n"
-        "• يوتيوب YouTube\n"
-        "• تويتر Twitter/X\n" 
-        "• انستغرام Instagram\n"
-        "• فيسبوك Facebook\n"
-        "• تيك توك TikTok\n"
-        "• ريديت Reddit\n"
-        "• والمزيد..."
+        "• يوتيوب YouTube\n• تويتر/X\n• انستغرام Instagram\n"
+        "• فيسبوك Facebook\n• تيك توك TikTok\n• ريديت Reddit\n"
+        "• تويتش Twitch\n• وغيرها الكثير..."
     )
 
 async def is_subscribed(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -63,33 +41,22 @@ async def is_subscribed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"خطأ أثناء التحقق من الاشتراك: {e}")
         return False
 
-def is_supported_url(url: str) -> bool:
-    """يتحقق إذا كان الرابط من منصة مدعومة"""
-    import re
-    # تحقق من أن الرابط يحتوي على نطاق من المنصات المدعومة
-    return any(platform in url for platform in SUPPORTED_PLATFORMS)
-
 def download_video(url: str) -> str:
-    """تحميل الفيديو من أي منصة"""
+    """تحميل الفيديو وإرجاع المسار"""
     ydl_opts = {
-        "format": "best",  # أفضل جودة متاحة
+        "format": "best",
         "outtmpl": "downloads/%(title)s.%(ext)s",
         "cookiefile": COOKIES_FILE if os.path.exists(COOKIES_FILE) else None,
         "quiet": True,
         "socket_timeout": 30,
         "retries": 3,
-        "noplaylist": True,  # عدم تحميل القوائم
+        "noplaylist": True,
     }
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
             filename = ydl.prepare_filename(info)
-            
-            # تسجيل معلومات المنصة
-            platform = info.get('extractor', 'unknown')
-            logger.info(f"تم التحميل من {platform}: {info.get('title', 'unknown')}")
-            
             return filename
     except Exception as e:
         logger.error(f"خطأ في التحميل: {e}")
@@ -101,21 +68,10 @@ async def download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     url = update.message.text.strip()
-    
-    # التحقق إذا كان الرابط مدعوم
-    if not is_supported_url(url):
-        await update.message.reply_text(
-            "❌ هذا الرابط غير مدعوم أو غير صحيح\n\n"
-            "✅ المنصات المدعومة:\n"
-            "• يوتيوب\n• تويتر/X\n• انستغرام\n• فيسبوك\n"
-            "• تيك توك\n• ريديت\n• تويتش\n• وغيرها\n\n"
-            "🔗 مثال: https://www.youtube.com/watch?v=..."
-        )
-        return
-
     await update.message.reply_text("⏳ جاري التحميل، انتظر شوي...")
 
     try:
+        # استخدام asyncio.to_thread للدوال الغير async
         filename = await asyncio.to_thread(download_video, url)
         
         await update.message.reply_text("✅ تم التحميل! جاري الإرسال...")
@@ -134,7 +90,10 @@ async def download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         error_msg = str(e)
         
         if "Private" in error_msg or "Sign in" in error_msg:
-            await update.message.reply_text("🔒 هذا المحتوى خاص أو يتطلب تسجيل دخول")
+            await update.message.reply_text(
+                "🔒 هذا المحتوى خاص أو يتطلب تسجيل دخول\n\n"
+                "تأكد من وجود ملف cookies.txt صالح للتحميل"
+            )
         elif "Unsupported" in error_msg:
             await update.message.reply_text("❌ هذه المنصة غير مدعومة حالياً")
         else:
@@ -146,17 +105,13 @@ async def cookies_info(update: Update, context: ContextTypes.DEFAULT_TYPE):
         file_size = os.path.getsize(COOKIES_FILE)
         await update.message.reply_text(f"📁 ملف الكوكيز موجود\nالحجم: {file_size} bytes")
     else:
-        await update.message.reply_text("❌ ملف cookies.txt غير موجود")
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """عرض رسالة المساعدة"""
-    await update.message.reply_text(
-        "📖 أوامر البوت:\n\n"
-        "/start - بدء استخدام البوت\n"
-        "/help - عرض هذه الرسالة\n"
-        "/cookies - معلومات عن ملف الكوكيز\n\n"
-        "📱 فقط أرسل رابط الفيديو وسأحمله لك!"
-    )
+        await update.message.reply_text(
+            "❌ ملف cookies.txt غير موجود\n\n"
+            "لإضافة ملف الكوكيز:\n"
+            "1. استخدم إضافة 'Get cookies.txt LOCALLY' في Kiwi\n"
+            "2. احفظ الملف في نفس مجلد البوت\n"
+            "3. تأكد من تسميته cookies.txt"
+        )
 
 # ──────────── تشغيل التطبيق ────────────
 if __name__ == "__main__":
@@ -166,9 +121,14 @@ if __name__ == "__main__":
     if not os.path.exists("downloads"):
         os.makedirs("downloads")
 
+    # التحقق من وجود ملف الكوكيز
+    if os.path.exists(COOKIES_FILE):
+        logger.info(f"✅ تم العثور على ملف الكوكيز: {COOKIES_FILE}")
+    else:
+        logger.warning("⚠️ ملف cookies.txt غير موجود - التحميل بدون مصادقة")
+
     app = Application.builder().token(TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_command))
     app.add_handler(CommandHandler("cookies", cookies_info))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, download_handler))
 
