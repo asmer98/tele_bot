@@ -1,34 +1,66 @@
-name: Run Telegram Bot
-
+name: Run YouTube Download Bot
 on:
-  workflow_dispatch:   # تشغيل يدوي
-  push:                # يشتغل عند أي دفع للكود
-  schedule:            # يعيد تشغيله كل ساعة
-    - cron: "0 * * * *"
+  workflow_dispatch:  # يسمح بتشغيل Workflow يدوياً
+  schedule:
+    - cron: '0 0 * * *'  # يشغل تلقائياً كل يوم في منتصف الليل (اختياري)
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-
+    
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+    # 1. Checkout الكود
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
+    # 2. إعداد Python
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: "3.10"
+        python-version: '3.10'
+        cache: 'pip'
 
-    - name: Install ffmpeg
-      run: sudo apt-get update && sudo apt-get install -y ffmpeg
-
+    # 3. تثبيت dependencies
     - name: Install dependencies
       run: |
+        python -m pip install --upgrade pip
         pip install -r requirements.txt
-        pip install -U yt-dlp   # تحديث yt-dlp دائماً
+        pip install yt-dlp
+        pip install python-telegram-bot --upgrade
 
-    - name: Run bot
-      env:
-        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+    # 4. إنشاء ملف cookies.txt من GitHub Secrets
+    - name: Create cookies file
       run: |
+        # إنشاء مجلد التحميلات
+        mkdir -p downloads
+        
+        # إنشاء ملف cookies.txt من السر
+        echo '${{ secrets.COOKIES_FILE }}' > cookies.txt
+        
+        # التحقق من أن الملف تم إنشاؤه بشكل صحيح
+        if [ -s "cookies.txt" ]; then
+          echo "✅ تم إنشاء cookies.txt بنجاح"
+          echo "حجم الملف: $(wc -l < cookies.txt) سطر"
+          head -2 cookies.txt  # عرض أول سطرين للتحقق
+        else
+          echo "❌ تحذير: ملف cookies.txt فارغ أو غير موجود"
+          # إنشاء ملف فارغ لتجنب الأخطاء
+          touch cookies.txt
+        fi
+
+    # 5. تشغيل البوت
+    - name: Run the bot
+      env:
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}  # توكن البوت من Secrets
+      run: |
+        echo "🚀 بدء تشغيل البوت..."
         python bot.py
+
+    # 6. تنظيف الملفات المؤقتة (اختياري)
+    - name: Cleanup temporary files
+      if: always()  # يعمل حتى لو فشلت الخطوة السابقة
+      run: |
+        echo "🧹 تنظيف الملفات المؤقتة..."
+        rm -f cookies.txt
+        rm -rf downloads/*
+        echo "تم التنظيف"
