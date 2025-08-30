@@ -39,55 +39,61 @@ async def is_subscribed(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return False
 
 def download_video(url: str) -> str:
-    """تحميل الفيديو بإعدادات بديلة"""
-    import subprocess
-    import random
-    
-    # إنشاء اسم ملف عشوائي لمنع التعارض
-    random_id = random.randint(1000, 9999)
-    output_template = f"downloads/video_{random_id}.%(ext)s"
-    
-    # بناء أمر yt-dlp يدويًا
-    cmd = [
-        "yt-dlp",
-        "-f", "best[height<=720]",  # دقة متوسطة لزيادة النجاح
-        "--no-part",
-        "--socket-timeout", "30",
-        "--retries", "5",
-        "--fragment-retries", "5",
-        "--output", output_template,
-    ]
-    
-    # إضافة الكوكيز إذا موجود
-    if os.path.exists(COOKIES_FILE):
-        cmd.extend(["--cookies", COOKIES_FILE])
-    
-    # إضافة الرابط
-    cmd.append(url)
-    
-    try:
-        # تنفيذ الأمر مباشرة
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    """تحميل الفيديو بإعدادات خاصة ل GitHub Actions"""
+    ydl_opts = {
+        # الإعدادات الأساسية
+        "format": "bestvideo+bestaudio/best",
+        "outtmpl": "downloads/%(title)s.%(ext)s",
+        "merge_output_format": "mp4",
+        "cookiefile": COOKIES_FILE if os.path.exists(COOKIES_FILE) else None,
         
-        if result.returncode != 0:
-            logger.error(f"خطأ في الأمر: {result.stderr}")
-            raise Exception(f"فشل التنفيذ: {result.stderr}")
+        # 🔥 الإعدادات الحاسمة لحل المشكلة:
+        "verbose": True,
+        "no_warnings": False,
+        "ignoreerrors": False,
         
-        # البحث عن الملف المحمل
-        download_dir = "downloads"
-        for file in os.listdir(download_dir):
-            if file.startswith(f"video_{random_id}"):
-                return os.path.join(download_dir, file)
+        # إعدادات الشبكة المهمة
+        "socket_timeout": 120,
+        "retries": 10,
+        "fragment_retries": 10,
+        "skip_unavailable_fragments": True,
+        "continue_dl": True,
         
-        raise Exception("لم يتم العثور على الملف بعد التحميل")
+        # ⚡ إعدادات يوتيوب المحددة
+        "extract_flat": False,
+        "live_from_start": True,
+        "wait_for_video": (5, 60),
         
-    except subprocess.TimeoutExpired:
-        logger.error("انتهى وقت التحميل")
-        raise Exception("التحميل أخذ وقت طويل جداً")
-    except Exception as e:
-        logger.error(f"خطأ في التحميل: {e}")
-        raise
+        # 🌐 إعدادات User-Agent للتحايل على الحجب
+        "http_headers": {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-us,en;q=0.5",
+            "Accept-Encoding": "gzip,deflate",
+            "Accept-Charset": "ISO-8859-1,utf-8;q=0.7,*;q=0.7",
+            "Connection": "keep-alive",
+        },
+        
+        # إعدادات الأداء
+        "concurrent_fragment_downloads": 3,
+        "buffersize": 1024 * 1024,
+    }
 
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            # تحميل المعلومات أولاً
+            info = ydl.extract_info(url, download=False)
+            logger.info(f"⏳ جاري تحميل: {info.get('title', 'unknown')}")
+            
+            # التحميل الفعلي
+            ydl.download([url])
+            
+            filename = ydl.prepare_filename(info)
+            return filename
+            
+    except Exception as e:
+        logger.error(f"خطأ في التحميل: {e}", exc_info=True)
+        raise Exception(f"فشل التحميل: {str(e)}")
 async def download_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_subscribed(update, context):
         await update.message.reply_text(
